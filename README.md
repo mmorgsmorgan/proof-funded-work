@@ -8,7 +8,7 @@ Q'IT is a stablecoin-native marketplace MVP for Arc testnet. Clients deposit the
 - RPC: `https://rpc.testnet.arc.network`
 - Explorer: `https://testnet.arcscan.app`
 - Test USDC: `0x3600000000000000000000000000000000000000` (6 decimals)
-- FundedWorkEscrow: `0x2cDd9997A86AcD2260623Ca9825EC49681302632`
+- FundedWorkEscrow: `0x88320E62566c78a7A40dAb47b7C95977e4622f02`
 - Deployment tx: `0xc73eeba08c93c10b3eb611cfa48b88f845e2b02ac23406e21ebcfa729ddf7b61`
 
 ## Contracts

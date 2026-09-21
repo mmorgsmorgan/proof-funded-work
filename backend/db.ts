@@ -24,13 +24,22 @@ function openDatabase() {
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
       privy_user_id TEXT NOT NULL UNIQUE,
-      email TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
       role TEXT NOT NULL CHECK (role IN ('worker', 'task_giver')),
       wallet_address TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS accounts_email_idx ON accounts(email);
+    CREATE INDEX IF NOT EXISTS accounts_wallet_idx ON accounts(wallet_address);
+  `);
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS idempotency_keys (
+      key TEXT PRIMARY KEY,
+      response_status INTEGER NOT NULL,
+      response_body TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
   return database;
 }

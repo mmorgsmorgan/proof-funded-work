@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+cache
+broadcast
+data
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+.DS_Store
+.git
+drizzle

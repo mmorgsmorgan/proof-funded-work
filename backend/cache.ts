@@ -28,8 +28,11 @@ export async function connectRedis(url?: string): Promise<void> {
   }
   try {
     // Dynamic import so the app doesn't crash if redis isn't installed
-    const { createClient } = await import('redis') as any;
-    redisClient = createClient({ url: redisUrl });
+    // @ts-ignore — redis is an optional dependency
+    const mod = await import('redis');
+    const createClient = mod.createClient || mod.default?.createClient;
+    if (!createClient) throw new Error('redis module has no createClient export');
+    redisClient = createClient({ url: redisUrl }) as RedisLike;
     await (redisClient as any).connect();
     logger.info('redis_connected', { url: redisUrl.replace(/\/\/.*@/, '//***@') });
   } catch (err) {
@@ -76,12 +79,4 @@ export async function invalidate(key: string): Promise<void> {
   } catch {
     // Best-effort invalidation
   }
-}
-
-/** Invalidate all keys matching a prefix pattern. */
-export async function invalidatePrefix(prefix: string): Promise<void> {
-  if (redisUnavailable || !redisClient) return;
-  // For simple cases, invalidate known keys
-  // Full pattern scanning requires SCAN which we avoid for simplicity
-  logger.info('cache_invalidate_prefix', { prefix });
 }

@@ -128,7 +128,7 @@ function handleJobCancelled(args: { jobId: bigint; refund: bigint }, blockNumber
 // Query helpers for the frontend
 export function getCachedJobs(filters?: { client?: string; status?: number }) {
   let query = 'SELECT * FROM cached_jobs';
-  const params: unknown[] = [];
+  const params: (string | number)[] = [];
   const conditions: string[] = [];
   if (filters?.client) { conditions.push('client = ?'); params.push(filters.client.toLowerCase()); }
   if (filters?.status !== undefined) { conditions.push('status = ?'); params.push(filters.status); }
@@ -139,7 +139,7 @@ export function getCachedJobs(filters?: { client?: string; status?: number }) {
 
 export function getCachedSubmissions(filters?: { jobId?: number; worker?: string }) {
   let query = 'SELECT * FROM cached_submissions';
-  const params: unknown[] = [];
+  const params: (string | number)[] = [];
   const conditions: string[] = [];
   if (filters?.jobId !== undefined) { conditions.push('job_id = ?'); params.push(filters.jobId); }
   if (filters?.worker) { conditions.push('worker = ?'); params.push(filters.worker.toLowerCase()); }

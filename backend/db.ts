@@ -16,7 +16,11 @@ export type AccountRecord = {
 const globalDatabase = globalThis as typeof globalThis & { qitDatabase?: DatabaseSync };
 
 function openDatabase() {
-  const filename = process.env.QIT_DB_PATH || join(process.cwd(), 'data', 'qit.sqlite');
+  const raw = process.env.QIT_DB_PATH || '';
+  // Ignore database URLs — SQLite needs a file path, not a connection string
+  const filename = (raw && !raw.startsWith('postgresql') && !raw.startsWith('postgres') && !raw.startsWith('mysql'))
+    ? raw
+    : join(process.cwd(), 'data', 'qit.sqlite');
   mkdirSync(dirname(filename), { recursive: true });
   const database = new DatabaseSync(filename);
   database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');

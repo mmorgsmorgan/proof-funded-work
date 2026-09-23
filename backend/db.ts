@@ -18,9 +18,12 @@ const globalDatabase = globalThis as typeof globalThis & { qitDatabase?: Databas
 function openDatabase() {
   const raw = process.env.QIT_DB_PATH || '';
   // Ignore database URLs — SQLite needs a file path, not a connection string
-  const filename = (raw && !raw.startsWith('postgresql') && !raw.startsWith('postgres') && !raw.startsWith('mysql'))
-    ? raw
+  const isUrl = raw.startsWith('postgresql') || raw.startsWith('postgres') || raw.startsWith('mysql');
+  // On serverless (Vercel), only /tmp is writable
+  const defaultPath = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+    ? '/tmp/qit.sqlite'
     : join(process.cwd(), 'data', 'qit.sqlite');
+  const filename = (raw && !isUrl) ? raw : defaultPath;
   mkdirSync(dirname(filename), { recursive: true });
   const database = new DatabaseSync(filename);
   database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');

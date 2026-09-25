@@ -1,6 +1,7 @@
 'use client';
 
 import { PrivyProvider } from '@privy-io/react-auth';
+import { arcTestnet } from '../lib/arc';
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
 
@@ -18,6 +19,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           showWalletLoginFirst: false,
         },
         embeddedWallets: { createOnLogin: 'users-without-wallets' },
+        supportedChains: [arcTestnet],
+        defaultChain: arcTestnet
       }}
     >
       {children}

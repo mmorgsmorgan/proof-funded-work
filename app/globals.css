@@ -257,8 +257,8 @@ a { text-decoration: none; }
 .modal-close { position: absolute; top: 15px; right: 18px; color: var(--bg); font-size: 24px; }
 .create-modal h2 { margin: 1.4rem 0 2rem; font: 560 46px/ .95 var(--font-display); }
 .create-modal label { display: block; margin-top: 15px; color: rgba(10,10,10,.62); font-size: 11px; text-transform: uppercase; }
-.create-modal input { display: block; width: 100%; min-height: 44px; margin-top: 6px; padding: 0 10px; border: 1px solid rgba(10,10,10,.22); background: transparent; color: var(--bg); outline: 0; }
-.create-modal input:focus { border-color: var(--orange); }
+.create-modal input, .create-modal textarea { display: block; width: 100%; min-height: 44px; margin-top: 6px; padding: 0 10px; border: 1px solid rgba(10,10,10,.22); background: transparent; color: var(--bg); outline: 0; }
+.create-modal input:focus, .create-modal textarea:focus { border-color: var(--orange); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .modal-total { display: flex; justify-content: space-between; align-items: baseline; margin: 25px 0; padding-top: 13px; border-top: 1px solid rgba(10,10,10,.25); font-size: 12px; }
 .modal-total strong { font: 600 24px var(--font-display); }
@@ -299,3 +299,4 @@ a { text-decoration: none; }
 
 .submission-feedback { grid-column: 1 / -1; margin-top: 8px; padding: 12px; background: rgba(255, 85, 0, 0.1); border-left: 2px solid var(--orange); font-size: 13px; color: var(--ink-dim); }
 .feedback-status { margin-left: 8px; font-weight: bold; color: var(--orange); }
+.create-modal textarea { resize: vertical; min-height: 80px; padding-top: 12px; font-family: inherit; }

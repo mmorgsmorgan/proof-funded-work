@@ -103,7 +103,7 @@ function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ title: '', tasks: '100', rate: '1', days: '14' });
+  const [form, setForm] = useState({ title: '', tasks: '100', rate: '1', days: '14', isWhitelist: false });
   const [reviewingSubmission, setReviewingSubmission] = useState<Submission | null>(null);
   const [reviews, setReviews] = useState<Record<string, Review[]>>({});
 
@@ -167,7 +167,7 @@ function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string
       await embeddedWallet.switchChain(arcTestnet.id); const provider = await embeddedWallet.getEthereumProvider(); const client = createWalletClient({ account: wallet, chain: arcTestnet, transport: custom(provider) });
       const approval = await client.writeContract({ address: USDC_ADDRESS, abi: USDC_ABI, functionName: 'approve', args: [ESCROW_ADDRESS, totalTasks * reward] });
       setMessage(`USDC approval sent · ${approval.slice(0, 10)}… confirm job creation next.`);
-      const hash = await client.writeContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'createJob', args: [totalTasks, reward, deadline, form.title] });
+      const hash = await client.writeContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'createJob', args: [totalTasks, reward, deadline, form.title, form.isWhitelist] });
       setShowCreate(false); setMessage(`Job funded · ${hash.slice(0, 10)}…`); await refresh();
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Job creation was cancelled.'); }
     finally { setBusy(false); }
@@ -244,8 +244,14 @@ function ActivityView({ account, jobs, submissions, claimable }: { account: Acco
 
 function EmptyState({ text }: { text: string }) { return <div className="empty-state"><span>—</span><p>{text}</p></div>; }
 
-function CreateJobModal({ form, setForm, busy, onClose, onSubmit }: { form: { title: string; tasks: string; rate: string; days: string }; setForm: (form: { title: string; tasks: string; rate: string; days: string }) => void; busy: boolean; onClose: () => void; onSubmit: () => void }) {
-  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="create-modal"><button className="modal-close" onClick={onClose} aria-label="Close">×</button><span className="label">New funded job</span><h2>Lock the budget<br /><em>before the brief.</em></h2><label>Job title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="e.g. Receipt fields" /></label><div className="form-grid"><label>Tasks<input type="number" min="1" value={form.tasks} onChange={(event) => setForm({ ...form, tasks: event.target.value })} /></label><label>USDC / task<input type="number" min="0.000001" step="0.000001" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} /></label></div><label>Deadline<input type="number" min="1" value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} /></label><div className="modal-total"><span>Total escrow required</span><strong>${(Number(form.tasks || 0) * Number(form.rate || 0)).toFixed(2)} USDC</strong></div><button className="primary-button full" disabled={busy || !form.title} onClick={onSubmit}>Approve USDC and create job ↗</button><p className="modal-note">Your wallet will approve USDC, then create the escrow in two transactions.</p></div></div>;
+function CreateJobModal({ form, setForm, busy, onClose, onSubmit }: { form: { title: string; tasks: string; rate: string; days: string; isWhitelist: boolean }; setForm: (form: { title: string; tasks: string; rate: string; days: string; isWhitelist: boolean }) => void; busy: boolean; onClose: () => void; onSubmit: () => void }) {
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="create-modal"><button className="modal-close" onClick={onClose} aria-label="Close">×</button><span className="label">New funded job</span><h2>Lock the budget<br /><em>before the brief.</em></h2><label>Job title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="e.g. Receipt fields" /></label><div className="form-grid"><label>Tasks<input type="number" min="1" value={form.tasks} onChange={(event) => setForm({ ...form, tasks: event.target.value })} /></label><label>USDC / task<input type="number" min="0.000001" step="0.000001" value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} /></label></div><label>Deadline<input type="number" min="1" value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} /></label>
+<label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', cursor: 'pointer' }}>
+  <input type="checkbox" checked={form.isWhitelist} onChange={(e) => setForm({ ...form, isWhitelist: e.target.checked })} />
+  <span>Require Applications (Whitelist mode)</span>
+</label>
+<div className="modal-total">
+<span>Total escrow required</span><strong>${(Number(form.tasks || 0) * Number(form.rate || 0)).toFixed(2)} USDC</strong></div><button className="primary-button full" disabled={busy || !form.title} onClick={onSubmit}>Approve USDC and create job ↗</button><p className="modal-note">Your wallet will approve USDC, then create the escrow in two transactions.</p></div></div>;
 }
 
 function SettingsView({ account, wallet }: { account: Account; wallet?: `0x${string}` }) {

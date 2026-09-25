@@ -2,7 +2,7 @@ import { defineChain } from 'viem';
 
 export const ARC_RPC = process.env.NEXT_PUBLIC_ARC_RPC || 'https://rpc.testnet.arc.network';
 export const USDC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_ADDRESS || '0x3600000000000000000000000000000000000000') as `0x${string}`;
-export const ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x88320E62566c78a7A40dAb47b7C95977e4622f02') as `0x${string}`;
+export const ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x277aFbdE7B6C8F5Bf29107EE92592a5Ff430Cbd4') as `0x${string}`;
 export const arcTestnet = defineChain({ id: 5042002, name: 'Arc Testnet', nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 6 }, rpcUrls: { default: { http: [ARC_RPC] } }, blockExplorers: { default: { name: 'ArcScan', url: 'https://testnet.arcscan.app' } } });
 
 export const USDC_ABI = [
@@ -14,9 +14,10 @@ export const USDC_ABI = [
 export const ESCROW_ABI = [
   { type: 'function', name: 'nextJobId', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'nextSubmissionId', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'jobs', stateMutability: 'view', inputs: [{ name: '', type: 'uint256' }], outputs: [{ name: 'client', type: 'address' }, { name: 'rewardPerTask', type: 'uint128' }, { name: 'totalTasks', type: 'uint64' }, { name: 'verifiedTasks', type: 'uint64' }, { name: 'deadline', type: 'uint64' }, { name: 'status', type: 'uint8' }, { name: 'metadataURI', type: 'string' }] },
+  { type: 'function', name: 'jobs', stateMutability: 'view', inputs: [{ name: '', type: 'uint256' }], outputs: [{ name: 'client', type: 'address' }, { name: 'rewardPerTask', type: 'uint128' }, { name: 'totalTasks', type: 'uint64' }, { name: 'verifiedTasks', type: 'uint64' }, { name: 'deadline', type: 'uint64' }, { name: 'status', type: 'uint8' }, { name: 'metadataURI', type: 'string' }, { name: 'isWhitelist', type: 'bool' }] },
   { type: 'function', name: 'submissions', stateMutability: 'view', inputs: [{ name: '', type: 'uint256' }], outputs: [{ name: 'jobId', type: 'uint256' }, { name: 'worker', type: 'address' }, { name: 'submittedTasks', type: 'uint64' }, { name: 'approvedTasks', type: 'uint64' }, { name: 'proofHash', type: 'bytes32' }, { name: 'reviewed', type: 'bool' }] },
-  { type: 'function', name: 'createJob', stateMutability: 'nonpayable', inputs: [{ name: 'totalTasks', type: 'uint64' }, { name: 'rewardPerTask', type: 'uint128' }, { name: 'deadline', type: 'uint64' }, { name: 'metadataURI', type: 'string' }], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { type: 'function', name: 'createJob', stateMutability: 'nonpayable', inputs: [{ name: 'totalTasks', type: 'uint64' }, { name: 'rewardPerTask', type: 'uint128' }, { name: 'deadline', type: 'uint64' }, { name: 'metadataURI', type: 'string' }, { name: 'isWhitelist', type: 'bool' }], outputs: [{ name: 'jobId', type: 'uint256' }] },
+  { type: 'function', name: 'whitelistWorkers', stateMutability: 'nonpayable', inputs: [{ name: 'jobId', type: 'uint256' }, { name: 'workers', type: 'address[]' }], outputs: [] },
   { type: 'function', name: 'submitWork', stateMutability: 'nonpayable', inputs: [{ name: 'jobId', type: 'uint256' }, { name: 'submittedTasks', type: 'uint64' }, { name: 'proofHash', type: 'bytes32' }], outputs: [{ name: 'submissionId', type: 'uint256' }] },
   { type: 'function', name: 'verifyWork', stateMutability: 'nonpayable', inputs: [{ name: 'submissionId', type: 'uint256' }, { name: 'approvedTasks', type: 'uint64' }], outputs: [] },
   { type: 'function', name: 'claim', stateMutability: 'nonpayable', inputs: [{ name: 'jobId', type: 'uint256' }], outputs: [] },

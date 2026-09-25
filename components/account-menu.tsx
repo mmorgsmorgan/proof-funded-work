@@ -79,7 +79,16 @@ function PrivyAccountMenu() {
 
   const handleCopy = () => {
     if (!account) return;
-    navigator.clipboard.writeText(account.walletAddress);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(account.walletAddress);
+    } else {
+      const textArea = document.createElement('textarea');
+      textArea.value = account.walletAddress;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try { document.execCommand('copy'); } catch (err) {}
+      document.body.removeChild(textArea);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

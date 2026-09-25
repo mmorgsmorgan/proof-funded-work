@@ -8,6 +8,7 @@ import { arcTestnet, ESCROW_ABI, ESCROW_ADDRESS, USDC_ABI, USDC_ADDRESS } from '
 
 type Role = 'worker' | 'task_giver';
 type Account = { id: string; email: string; role: Role; walletAddress: string; createdAt: string };
+type Review = { id: string; submission_id: number; reviewer: string; feedback: string; status: 'changes_requested' | 'approved'; created_at: string };
 type Job = {
   id: bigint;
   client: `0x${string}`;
@@ -103,6 +104,8 @@ function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ title: '', tasks: '100', rate: '1', days: '14' });
+  const [reviewingSubmission, setReviewingSubmission] = useState<Submission | null>(null);
+  const [reviews, setReviews] = useState<Record<string, Review[]>>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -170,12 +173,51 @@ function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string
     finally { setBusy(false); }
   }
 
-  async function verifySubmission(submission: Submission) {
-    setBusy(true); setMessage('Confirm approval in the wallet…');
-    try { const hash = await writeContract('verifyWork', [submission.id, submission.submittedTasks]); setMessage(`Work approved · ${hash.slice(0, 10)}…`); await refresh(); }
-    catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Review was cancelled.'); }
-    finally { setBusy(false); }
+  
+  async function submitReview(submission: Submission, feedback: string, status: 'changes_requested' | 'approved') {
+    setBusy(true);
+    try {
+      if (status === 'approved') {
+        setMessage('Confirm approval in the wallet…');
+        const hash = await writeContract('verifyWork', [submission.id, submission.submittedTasks]);
+        setMessage(`Work approved · ${hash.slice(0, 10)}…`);
+      }
+      
+      const token = await getAccessToken();
+      await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submissionId: Number(submission.id), feedback, status })
+      });
+      
+      setReviewingSubmission(null);
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Review failed or was cancelled.');
+    } finally {
+      setBusy(false);
+    }
   }
+
+  async function fetchReviews(submissionIds: number[]) {
+    const newReviews = { ...reviews };
+    for (const id of submissionIds) {
+      if (newReviews[id]) continue;
+      try {
+        const res = await fetch(`/api/reviews?submissionId=${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          newReviews[id] = data.reviews;
+        }
+      } catch {}
+    }
+    setReviews(newReviews);
+  }
+
+  useEffect(() => {
+    if (submissions.length > 0) fetchReviews(submissions.map(s => Number(s.id)));
+  }, [submissions]);
+
 
   async function cancelJob(jobId: bigint) {
     setBusy(true); setMessage('Confirm the expired-job refund in the wallet…');
@@ -184,15 +226,16 @@ function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string
     finally { setBusy(false); }
   }
 
-  return <div className="app-shell"><header className="app-topbar container"><a className="site-name" href="/">Q&apos;IT</a><nav className="workspace-nav"><button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}>Market</button><button className={tab === 'activity' ? 'active' : ''} onClick={() => setTab('activity')}>Your activity</button></nav><div className="workspace-account"><span className="account-role">{account.role === 'task_giver' ? 'Task giver' : 'Worker'}</span><span>{shortAddress(wallet)}</span><button className="account-logout" onClick={logout} title="Sign out">×</button></div></header><main className="workspace-main container"><div className="workspace-heading"><div><span className="label">{account.role === 'task_giver' ? 'Task giver desk' : 'Worker desk'} / Arc testnet</span><h1>{account.role === 'task_giver' ? <>Put work<br /><em>onchain.</em></> : <>Find work<br /><em>that is funded.</em></>}</h1></div><div className="wallet-panel"><span>Embedded wallet</span><strong>{shortAddress(wallet)}</strong><small>Arc testnet · USDC</small></div></div>{tab === 'market' ? <>{account.role === 'task_giver' ? <TaskGiverView jobs={myJobs} submissions={submissions.filter((item) => myJobs.some((job) => job.id === item.jobId))} onCreate={() => setShowCreate(true)} onRefresh={refresh} onVerify={verifySubmission} onCancel={cancelJob} busy={busy} message={message} /> : <WorkerView jobs={openJobs} claimable={claimable} submissions={mySubmissions} onRefresh={refresh} busy={busy} message={message} onSubmit={submitWork} onClaim={claimJob} />}</> : <ActivityView account={account} jobs={jobs} submissions={account.role === 'worker' ? mySubmissions : submissions.filter((item) => myJobs.some((job) => job.id === item.jobId))} claimable={claimable} />}</main>{showCreate && <CreateJobModal form={form} setForm={setForm} busy={busy} onClose={() => setShowCreate(false)} onSubmit={createJob} />}</div>;
+  return <div className="app-shell"><header className="app-topbar container"><a className="site-name" href="/">Q&apos;IT</a><nav className="workspace-nav"><button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}>Market</button><button className={tab === 'activity' ? 'active' : ''} onClick={() => setTab('activity')}>Your activity</button></nav><div className="workspace-account"><span className="account-role">{account.role === 'task_giver' ? 'Task giver' : 'Worker'}</span><span>{shortAddress(wallet)}</span><button className="account-logout" onClick={logout} title="Sign out">×</button></div></header><main className="workspace-main container"><div className="workspace-heading"><div><span className="label">{account.role === 'task_giver' ? 'Task giver desk' : 'Worker desk'} / Arc testnet</span><h1>{account.role === 'task_giver' ? <>Put work<br /><em>onchain.</em></> : <>Find work<br /><em>that is funded.</em></>}</h1></div><div className="wallet-panel"><span>Embedded wallet</span><strong>{shortAddress(wallet)}</strong><small>Arc testnet · USDC</small></div></div>{tab === 'market' ? <>{account.role === 'task_giver' ? <TaskGiverView jobs={myJobs} submissions={submissions.filter((item) => myJobs.some((job) => job.id === item.jobId))} onCreate={() => setShowCreate(true)} onRefresh={refresh} onVerify={setReviewingSubmission} onCancel={cancelJob} busy={busy} message={message} /> : <WorkerView jobs={openJobs} claimable={claimable} submissions={mySubmissions} reviews={reviews} onRefresh={refresh} busy={busy} message={message} onSubmit={submitWork} onClaim={claimJob} />}</> : <ActivityView account={account} jobs={jobs} submissions={account.role === 'worker' ? mySubmissions : submissions.filter((item) => myJobs.some((job) => job.id === item.jobId))} claimable={claimable} />}</main>{showCreate && <CreateJobModal form={form} setForm={setForm} busy={busy} onClose={() => setShowCreate(false)} onSubmit={createJob} />}
+{reviewingSubmission && <ReviewModal submission={reviewingSubmission} busy={busy} onClose={() => setReviewingSubmission(null)} onSubmit={(feedback, status) => submitReview(reviewingSubmission, feedback, status)} />}</div>;
 }
 
-function WorkerView({ jobs, claimable, submissions, onRefresh, busy, message, onSubmit, onClaim }: { jobs: Job[]; claimable: bigint; submissions: Submission[]; onRefresh: () => void; busy: boolean; message: string; onSubmit: (jobId: bigint) => void; onClaim: (jobId: bigint) => void }) {
-  return <section className="workspace-section"><div className="section-head"><div><span className="label">Open funded work</span><h2>Work with money already locked.</h2></div><div className="claim-panel"><span>Claimable total</span><strong>${formatUnits(claimable, 6)}</strong><button disabled={busy || claimable === 0n} onClick={() => { const job = submissions.find((item) => item.reviewed && item.approvedTasks > 0n); if (job) onClaim(job.jobId); else onRefresh(); }}>{claimable > 0n ? 'Claim approved USDC ↗' : 'Refresh balance ↻'}</button></div></div><div className="workspace-table"><div className="workspace-table-head"><span>Job</span><span>Funded</span><span>Rate</span><span>Progress</span><span /></div>{jobs.length === 0 ? <EmptyState text="No open funded jobs yet. Task givers can publish the first batch." /> : jobs.map((job) => <article className="workspace-job" key={job.id}><div><small>JOB {job.id.toString().padStart(4, '0')}</small><h3>{jobCopy(job.metadataURI)}</h3><p>Client {shortAddress(job.client)}</p></div><div><strong>${formatUnits(job.rewardPerTask * job.totalTasks, 6)}</strong><small>USDC escrowed</small></div><div><strong>${formatUnits(job.rewardPerTask, 6)}</strong><small>per task</small></div><div><strong>{job.verifiedTasks.toString()} / {job.totalTasks.toString()}</strong><div className="mini-track"><i style={{ width: `${Number((job.verifiedTasks * 100n) / job.totalTasks)}%` }} /></div></div><button className="table-action" disabled={busy} onClick={() => onSubmit(job.id)}>Submit proof ↗</button></article>)}</div><div className="workspace-subsection"><div className="section-head compact"><div><span className="label">Recent submissions</span><h2>Your proof trail.</h2></div><button className="quiet-button" onClick={onRefresh}>Refresh ↻</button></div>{submissions.length === 0 ? <EmptyState text="Your submitted work will appear here." /> : <div className="submission-list">{submissions.slice(0, 6).map((item) => <div className="submission-row" key={item.id}><span>#{item.id.toString()}</span><strong>Job {item.jobId.toString()}</strong><span>{item.submittedTasks.toString()} tasks</span><span className={item.reviewed ? 'reviewed' : 'pending'}>{item.reviewed ? `${item.approvedTasks.toString()} approved` : 'Awaiting review'}</span></div>)}</div>}</div>{message && <p className="workspace-message">{message}</p>}</section>;
+function WorkerView({ jobs, claimable, submissions, reviews, onRefresh, busy, message, onSubmit, onClaim }: { jobs: Job[]; claimable: bigint; submissions: Submission[]; reviews: Record<string, Review[]>; onRefresh: () => void; busy: boolean; message: string; onSubmit: (jobId: bigint) => void; onClaim: (jobId: bigint) => void }) {
+  return <section className="workspace-section"><div className="section-head"><div><span className="label">Open funded work</span><h2>Work with money already locked.</h2></div><div className="claim-panel"><span>Claimable total</span><strong>${formatUnits(claimable, 6)}</strong><button disabled={busy || claimable === 0n} onClick={() => { const job = submissions.find((item) => item.reviewed && item.approvedTasks > 0n); if (job) onClaim(job.jobId); else onRefresh(); }}>{claimable > 0n ? 'Claim approved USDC ↗' : 'Refresh balance ↻'}</button></div></div><div className="workspace-table"><div className="workspace-table-head"><span>Job</span><span>Funded</span><span>Rate</span><span>Progress</span><span /></div>{jobs.length === 0 ? <EmptyState text="No open funded jobs yet. Task givers can publish the first batch." /> : jobs.map((job) => <article className="workspace-job" key={job.id}><div><small>JOB {job.id.toString().padStart(4, '0')}</small><h3>{jobCopy(job.metadataURI)}</h3><p>Client {shortAddress(job.client)}</p></div><div><strong>${formatUnits(job.rewardPerTask * job.totalTasks, 6)}</strong><small>USDC escrowed</small></div><div><strong>${formatUnits(job.rewardPerTask, 6)}</strong><small>per task</small></div><div><strong>{job.verifiedTasks.toString()} / {job.totalTasks.toString()}</strong><div className="mini-track"><i style={{ width: `${Number((job.verifiedTasks * 100n) / job.totalTasks)}%` }} /></div></div><button className="table-action" disabled={busy} onClick={() => onSubmit(job.id)}>Submit proof ↗</button></article>)}</div><div className="workspace-subsection"><div className="section-head compact"><div><span className="label">Recent submissions</span><h2>Your proof trail.</h2></div><button className="quiet-button" onClick={onRefresh}>Refresh ↻</button></div>{submissions.length === 0 ? <EmptyState text="Your submitted work will appear here." /> : <div className="submission-list">{submissions.slice(0, 6).map((item) => <div className="submission-row" key={item.id}><span>#{item.id.toString()}</span><strong>Job {item.jobId.toString()}</strong><span>{item.submittedTasks.toString()} tasks</span><span className={item.reviewed ? 'reviewed' : 'pending'}>{item.reviewed ? `${item.approvedTasks.toString()} approved` : 'Awaiting review'}</span>{reviews[item.id.toString()]?.length > 0 && (  <div className="submission-feedback">    <strong>Feedback: </strong> {reviews[item.id.toString()][0].feedback}     <span className="feedback-status">({reviews[item.id.toString()][0].status === 'changes_requested' ? 'Changes requested' : 'Approved'})</span>  </div>)}</div>)}</div>}</div>{message && <p className="workspace-message">{message}</p>}</section>;
 }
 
 function TaskGiverView({ jobs, submissions, onCreate, onRefresh, onVerify, onCancel, busy, message }: { jobs: Job[]; submissions: Submission[]; onCreate: () => void; onRefresh: () => void; onVerify: (submission: Submission) => void; onCancel: (jobId: bigint) => void; busy: boolean; message: string }) {
-  return <section className="workspace-section"><div className="section-head"><div><span className="label">Your funded work</span><h2>Turn a brief into a funded market.</h2></div><button className="primary-button" onClick={onCreate}>Create funded job +</button></div><div className="workspace-kpis"><div><span>Active jobs</span><strong>{jobs.filter((job) => job.status === 1).length}</strong></div><div><span>USDC locked</span><strong>${formatUnits(jobs.reduce((sum, job) => sum + (job.rewardPerTask * job.totalTasks), 0n), 6)}</strong></div><div><span>Proofs to review</span><strong>{submissions.filter((item) => !item.reviewed).length}</strong></div></div><div className="workspace-table"><div className="workspace-table-head"><span>Job</span><span>Budget</span><span>Verified</span><span>Status</span><span /></div>{jobs.length === 0 ? <EmptyState text="You have no jobs yet. Create one and lock the full budget before workers begin." /> : jobs.map((job) => <article className="workspace-job" key={job.id}><div><small>JOB {job.id.toString().padStart(4, '0')}</small><h3>{jobCopy(job.metadataURI)}</h3><p>Deadline {new Date(Number(job.deadline) * 1000).toLocaleDateString()}</p></div><div><strong>${formatUnits(job.rewardPerTask * job.totalTasks, 6)}</strong><small>USDC locked</small></div><div><strong>{job.verifiedTasks.toString()} / {job.totalTasks.toString()}</strong><small>tasks verified</small></div><div><strong className={job.status === 1 ? 'status-open' : 'status-closed'}>{statusLabel(job.status)}</strong><small>onchain state</small></div><button className="table-action" disabled={busy || Number(job.deadline) * 1000 > Date.now()} onClick={() => onCancel(job.id)}>Refund expired ↗</button></article>)}</div><div className="workspace-subsection"><div className="section-head compact"><div><span className="label">Verification queue</span><h2>Approve completed work.</h2></div><button className="quiet-button" onClick={onRefresh}>Refresh ↻</button></div>{submissions.filter((item) => !item.reviewed).length === 0 ? <EmptyState text="No pending proofs. New worker submissions will land here." /> : <div className="submission-list">{submissions.filter((item) => !item.reviewed).map((item) => <div className="submission-row" key={item.id}><span>#{item.id.toString()}</span><strong>Job {item.jobId.toString()}</strong><span>{item.submittedTasks.toString()} tasks from {shortAddress(item.worker)}</span><button className="table-action small" disabled={busy} onClick={() => onVerify(item)}>Approve all ↗</button></div>)}</div>}</div>{message && <p className="workspace-message">{message}</p>}</section>;
+  return <section className="workspace-section"><div className="section-head"><div><span className="label">Your funded work</span><h2>Turn a brief into a funded market.</h2></div><button className="primary-button" onClick={onCreate}>Create funded job +</button></div><div className="workspace-kpis"><div><span>Active jobs</span><strong>{jobs.filter((job) => job.status === 1).length}</strong></div><div><span>USDC locked</span><strong>${formatUnits(jobs.reduce((sum, job) => sum + (job.rewardPerTask * job.totalTasks), 0n), 6)}</strong></div><div><span>Proofs to review</span><strong>{submissions.filter((item) => !item.reviewed).length}</strong></div></div><div className="workspace-table"><div className="workspace-table-head"><span>Job</span><span>Budget</span><span>Verified</span><span>Status</span><span /></div>{jobs.length === 0 ? <EmptyState text="You have no jobs yet. Create one and lock the full budget before workers begin." /> : jobs.map((job) => <article className="workspace-job" key={job.id}><div><small>JOB {job.id.toString().padStart(4, '0')}</small><h3>{jobCopy(job.metadataURI)}</h3><p>Deadline {new Date(Number(job.deadline) * 1000).toLocaleDateString()}</p></div><div><strong>${formatUnits(job.rewardPerTask * job.totalTasks, 6)}</strong><small>USDC locked</small></div><div><strong>{job.verifiedTasks.toString()} / {job.totalTasks.toString()}</strong><small>tasks verified</small></div><div><strong className={job.status === 1 ? 'status-open' : 'status-closed'}>{statusLabel(job.status)}</strong><small>onchain state</small></div><button className="table-action" disabled={busy || Number(job.deadline) * 1000 > Date.now()} onClick={() => onCancel(job.id)}>Refund expired ↗</button></article>)}</div><div className="workspace-subsection"><div className="section-head compact"><div><span className="label">Verification queue</span><h2>Approve completed work.</h2></div><button className="quiet-button" onClick={onRefresh}>Refresh ↻</button></div>{submissions.filter((item) => !item.reviewed).length === 0 ? <EmptyState text="No pending proofs. New worker submissions will land here." /> : <div className="submission-list">{submissions.filter((item) => !item.reviewed).map((item) => <div className="submission-row" key={item.id}><span>#{item.id.toString()}</span><strong>Job {item.jobId.toString()}</strong><span>{item.submittedTasks.toString()} tasks from {shortAddress(item.worker)}</span><button className=\"table-action small\" disabled={busy} onClick={() => onVerify(item)}>Review</button></div>)}</div>}</div>{message && <p className="workspace-message">{message}</p>}</section>;
 }
 
 function ActivityView({ account, jobs, submissions, claimable }: { account: Account; jobs: Job[]; submissions: Submission[]; claimable: bigint }) {
@@ -207,4 +250,25 @@ function CreateJobModal({ form, setForm, busy, onClose, onSubmit }: { form: { ti
 
 function SettingsView({ account, wallet }: { account: Account; wallet?: `0x${string}` }) {
   return <section className="workspace-section"><div className="section-head"><div><span className="label">Settings</span><h2>Manage your account.</h2></div></div><div className="activity-grid"><div><span>Wallet Address</span><strong>{wallet || 'Loading...'}</strong></div><div><span>Email</span><strong>{account.email}</strong></div><div><span>Role</span><strong>{account.role === 'worker' ? 'Worker' : 'Task giver'}</strong></div><div><span>Network</span><strong>Arc Testnet (5042002)</strong></div><div><span>Escrow Contract</span><strong>{ESCROW_ADDRESS}</strong></div><div><span>USDC Contract</span><strong>{USDC_ADDRESS}</strong></div></div></section>;
+}
+
+function ReviewModal({ submission, busy, onClose, onSubmit }: { submission: Submission; busy: boolean; onClose: () => void; onSubmit: (feedback: string, status: 'changes_requested' | 'approved') => void }) {
+  const [feedback, setFeedback] = useState('');
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="create-modal">
+        <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+        <span className="label">Submission #{submission.id.toString()}</span>
+        <h2>Review and respond.</h2>
+        <label>Feedback
+          <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="e.g., Looks good! Or: Please fix the layout on page 2." rows={4} />
+        </label>
+        <div className="form-grid">
+          <button className="account-button" disabled={busy || !feedback} onClick={() => onSubmit(feedback, 'changes_requested')}>Request Changes</button>
+          <button className="primary-button" disabled={busy} onClick={() => onSubmit(feedback, 'approved')}>Approve Work ↗</button>
+        </div>
+        <p className="modal-note">Requesting changes sends feedback off-chain. Approving sends an on-chain transaction to release USDC.</p>
+      </div>
+    </div>
+  );
 }

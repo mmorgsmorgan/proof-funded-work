@@ -48,6 +48,17 @@ function openDatabase() {
       created_at TEXT NOT NULL
     );
   `);
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id TEXT PRIMARY KEY,
+      submission_id INTEGER NOT NULL,
+      reviewer TEXT NOT NULL,
+      feedback TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('changes_requested', 'approved')),
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS reviews_submission_idx ON reviews(submission_id);
+  `);
   return database;
 }
 

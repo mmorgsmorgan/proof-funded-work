@@ -296,3 +296,6 @@ a { text-decoration: none; }
 
 .account-copy { all: unset; cursor: pointer; color: inherit; transition: color .2s; }
 .account-copy:hover { color: var(--orange); }
+
+.submission-feedback { grid-column: 1 / -1; margin-top: 8px; padding: 12px; background: rgba(255, 85, 0, 0.1); border-left: 2px solid var(--orange); font-size: 13px; color: var(--ink-dim); }
+.feedback-status { margin-left: 8px; font-weight: bold; color: var(--orange); }

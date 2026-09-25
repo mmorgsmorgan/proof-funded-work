@@ -27,6 +27,7 @@ function PrivyAccountMenu() {
   const [choosingRole, setChoosingRole] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const loadAccount = useCallback(async () => {
     if (!authenticated) return;
@@ -76,6 +77,13 @@ function PrivyAccountMenu() {
     }
   }
 
+  const handleCopy = () => {
+    if (!account) return;
+    navigator.clipboard.writeText(account.walletAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   if (!ready) return <button className="account-button" disabled>Loading</button>;
   if (!authenticated) return <button className="account-button" onClick={login}>Continue with email</button>;
 
@@ -97,7 +105,9 @@ function PrivyAccountMenu() {
   return (
     <div className="signed-in-account">
       <span className="account-role">{account.role === 'task_giver' ? 'Task giver' : 'Worker'}</span>
-      <span>{account.walletAddress.slice(0, 6)}…{account.walletAddress.slice(-4)}</span>
+      <button className="account-copy" onClick={handleCopy} title="Copy full wallet address">
+        {copied ? 'Copied ✓' : `${account.walletAddress.slice(0, 6)}…${account.walletAddress.slice(-4)}`}
+      </button>
       <button className="account-logout" onClick={logout} title="Sign out">×</button>
     </div>
   );

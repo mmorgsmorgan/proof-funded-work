@@ -293,3 +293,6 @@ a { text-decoration: none; }
   .role-cards strong { margin-top: 2rem; }
   .create-modal { padding: 28px 20px; }
 }
+
+.account-copy { all: unset; cursor: pointer; color: inherit; transition: color .2s; }
+.account-copy:hover { color: var(--orange); }

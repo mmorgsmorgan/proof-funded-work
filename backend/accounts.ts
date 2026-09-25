@@ -10,7 +10,7 @@ export type PublicAccount = {
 };
 
 /** Generate a UUIDv7 (RFC 9562) — time-ordered, sortable by creation time. */
-function uuidv7(): string {
+export function uuidv7(): string {
   const now = Date.now();
   const bytes = randomBytes(16);
   // Encode 48-bit millisecond timestamp into the first 6 bytes

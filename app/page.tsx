@@ -9,16 +9,7 @@ import { arcTestnet, ESCROW_ABI, ESCROW_ADDRESS, USDC_ABI, USDC_ADDRESS } from '
 type Role = 'worker' | 'task_giver';
 type Account = { id: string; email: string; role: Role; walletAddress: string; createdAt: string };
 type Review = { id: string; submission_id: number; reviewer: string; feedback: string; status: 'changes_requested' | 'approved'; created_at: string };
-type Job = {
-  id: bigint;
-  client: `0x${string}`;
-  rewardPerTask: bigint;
-  totalTasks: bigint;
-  verifiedTasks: bigint;
-  deadline: bigint;
-  status: number;
-  metadataURI: string;
-};
+type Job = { id: bigint; client: `0x${string}`; rewardPerTask: bigint; totalTasks: bigint; verifiedTasks: bigint; deadline: bigint; status: number; metadataURI: string; isWhitelist: boolean; };
 type Submission = { id: bigint; jobId: bigint; worker: `0x${string}`; submittedTasks: bigint; approvedTasks: bigint; proofHash: `0x${string}`; reviewed: boolean };
 
 const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
@@ -93,12 +84,36 @@ function LandingPage() {
 }
 
 function Onboarding({ busy, accountError, onChoose }: { busy: boolean; accountError: string; onChoose: (role: Role) => void }) {
-  return <div className="app-shell"><header className="app-topbar container"><a className="site-name" href="/">Q&apos;IT</a><nav className="workspace-nav"><button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}>Dashboard</button><button className={tab === 'activity' ? 'active' : ''} onClick={() => setTab('activity')}>History</button><button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button></nav><div className="workspace-account"><AccountMenu /></div></header><main className="workspace-main container">{tab === 'market' ? <>{account.role === 'task_giver' ? <TaskGiverView jobs={myJobs} submissions={submissions.filter((item) => myJobs.some((job) => job.id === item.jobId))} onCreate={() => setShowCreate(true)} onRefresh={refresh} onVerify={setReviewingSubmission} onCancel={cancelJob} busy={busy} message={message} /> : <WorkerView jobs={openJobs} claimable={claimable} submissions={mySubmissions} reviews={reviews} onRefresh={refresh} busy={busy} message={message} onSubmit={submitWork} onClaim={claimJob} />}</> : tab === 'activity' ? <ActivityView account={account} jobs={jobs} submissions={account.role === 'worker' ? mySubmissions : submissions.filter((item) => myJobs.some((job) => job.id === item.jobId))} claimable={claimable} /> : <SettingsView account={account} wallet={wallet} />}</main>{showCreate && <CreateJobModal form={form} setForm={setForm} busy={busy} message={message} onClose={() => setShowCreate(false)} onSubmit={createJob} />}
-{reviewingSubmission && <ReviewModal submission={reviewingSubmission} busy={busy} onClose={() => setReviewingSubmission(null)} onSubmit={(feedback, status) => submitReview(reviewingSubmission, feedback, status)} />}</div>;
+  return (
+    <div className="app-shell">
+      <header className="app-topbar container">
+        <a className="site-name" href="/">Q&apos;IT</a>
+        <div className="workspace-account">
+          <AccountMenu />
+        </div>
+      </header>
+      <main className="workspace-main container">
+        <div className="workspace-heading">
+          <div>
+            <span className="label">Welcome</span>
+            <h1>Choose your role.</h1>
+          </div>
+        </div>
+        <div className="role-popover" style={{ marginTop: '2rem' }}>
+          <p>How will you use Q&apos;IT?</p>
+          <div className="role-actions">
+            <button className="primary-button" disabled={busy} onClick={() => onChoose('worker')}>Worker</button>
+            <button className="primary-button" disabled={busy} onClick={() => onChoose('task_giver')}>Task giver</button>
+          </div>
+          {accountError && <span className="account-error">{accountError}</span>}
+        </div>
+      </main>
+    </div>
+  );
 }
 
 function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string}` }) {
-  const { logout } = usePrivy();
+  const { logout, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
   const embeddedWallet = wallets[0];
   const [tab, setTab] = useState<'market' | 'activity' | 'settings'>('market');
@@ -118,8 +133,8 @@ function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string
       const jobCount = await publicClient.readContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'nextJobId' });
       const loadedJobs: Job[] = [];
       for (let index = 0n; index < jobCount; index++) {
-        const value = await publicClient.readContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'jobs', args: [index] }) as readonly [string, bigint, bigint, bigint, bigint, number, string];
-        loadedJobs.push({ id: index, client: value[0] as `0x${string}`, rewardPerTask: value[1], totalTasks: value[2], verifiedTasks: value[3], deadline: value[4], status: value[5], metadataURI: value[6] });
+        const value = await publicClient.readContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'jobs', args: [index] }) as readonly [string, bigint, bigint, bigint, bigint, number, string, boolean];
+        loadedJobs.push({ id: index, client: value[0] as `0x${string}`, rewardPerTask: value[1], totalTasks: value[2], verifiedTasks: value[3], deadline: value[4], status: value[5], metadataURI: value[6], isWhitelist: value[7] });
       }
       setJobs(loadedJobs.reverse());
       const submissionCount = await publicClient.readContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'nextSubmissionId' });

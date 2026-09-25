@@ -9,9 +9,10 @@ interface IERC20 {
 /// @title Proof of Funded Work
 /// @notice Clients lock the full USDC budget before workers can start. A verifier
 ///         attests to completed work; workers claim the corresponding USDC onchain.
+///         Jobs can optionally be permissionless or whitelist-gated.
 contract FundedWorkEscrow {
     enum JobStatus { None, Open, Completed, Cancelled }
-    struct Job { address client; uint128 rewardPerTask; uint64 totalTasks; uint64 verifiedTasks; uint64 deadline; JobStatus status; string metadataURI; }
+    struct Job { address client; uint128 rewardPerTask; uint64 totalTasks; uint64 verifiedTasks; uint64 deadline; JobStatus status; string metadataURI; bool isWhitelist; }
     struct Submission { uint256 jobId; address worker; uint64 submittedTasks; uint64 approvedTasks; bytes32 proofHash; bool reviewed; }
     struct Reputation { uint256 submittedTasks; uint256 approvedTasks; uint256 totalEarned; uint256 jobsCompleted; }
 
@@ -19,6 +20,8 @@ contract FundedWorkEscrow {
     address public owner;
     mapping(address => bool) public verifiers;
     mapping(uint256 => mapping(address => bool)) public jobVerifiers;
+    mapping(uint256 => mapping(address => bool)) public whitelistedWorkers;
+    
     uint256 public nextJobId;
     uint256 public nextSubmissionId;
     mapping(uint256 => Job) public jobs;
@@ -27,11 +30,13 @@ contract FundedWorkEscrow {
     mapping(address => mapping(uint256 => uint256)) public claimableByJob;
     mapping(address => Reputation) public reputation;
     mapping(address => mapping(uint256 => bool)) public contributedToJob;
+    
     uint256 private _lock = 1;
     bool public paused;
 
     event VerifierUpdated(address indexed verifier, bool enabled);
-    event JobCreated(uint256 indexed jobId, address indexed client, uint256 totalTasks, uint256 rewardPerTask, uint256 budget);
+    event JobCreated(uint256 indexed jobId, address indexed client, uint256 totalTasks, uint256 rewardPerTask, uint256 budget, bool isWhitelist);
+    event WorkersWhitelisted(uint256 indexed jobId, address[] workers);
     event WorkSubmitted(uint256 indexed submissionId, uint256 indexed jobId, address indexed worker, uint256 submittedTasks, bytes32 proofHash);
     event WorkVerified(uint256 indexed submissionId, uint256 indexed jobId, address indexed worker, uint256 approvedTasks, uint256 payout);
     event WorkClaimed(address indexed worker, uint256 indexed jobId, uint256 amount);
@@ -50,17 +55,25 @@ contract FundedWorkEscrow {
     function unpause() external onlyOwner { paused = false; emit Unpaused(msg.sender); }
     function setJobVerifier(uint256 jobId, address verifier, bool enabled) external { require(jobs[jobId].client == msg.sender, "not client"); jobVerifiers[jobId][verifier] = enabled; }
 
-    function createJob(uint64 totalTasks, uint128 rewardPerTask, uint64 deadline, string calldata metadataURI) external nonReentrant onlyWhenNotPaused returns (uint256 jobId) {
+    function createJob(uint64 totalTasks, uint128 rewardPerTask, uint64 deadline, string calldata metadataURI, bool isWhitelist) external nonReentrant onlyWhenNotPaused returns (uint256 jobId) {
         require(totalTasks > 0 && rewardPerTask > 0, "invalid economics"); require(deadline > block.timestamp, "deadline passed");
         uint256 budget = uint256(totalTasks) * uint256(rewardPerTask); jobId = nextJobId++;
-        jobs[jobId] = Job(msg.sender, rewardPerTask, totalTasks, 0, deadline, JobStatus.Open, metadataURI);
-        require(usdc.transferFrom(msg.sender, address(this), budget), "funding failed"); emit JobCreated(jobId, msg.sender, totalTasks, rewardPerTask, budget);
+        jobs[jobId] = Job(msg.sender, rewardPerTask, totalTasks, 0, deadline, JobStatus.Open, metadataURI, isWhitelist);
+        require(usdc.transferFrom(msg.sender, address(this), budget), "funding failed"); emit JobCreated(jobId, msg.sender, totalTasks, rewardPerTask, budget, isWhitelist);
+    }
+
+    function whitelistWorkers(uint256 jobId, address[] calldata workers) external onlyWhenNotPaused {
+        require(jobs[jobId].client == msg.sender, "not client");
+        require(jobs[jobId].isWhitelist, "not whitelist job");
+        for (uint256 i = 0; i < workers.length; i++) { whitelistedWorkers[jobId][workers[i]] = true; }
+        emit WorkersWhitelisted(jobId, workers);
     }
 
     function submitWork(uint256 jobId, uint64 submittedTasks, bytes32 proofHash) external onlyWhenNotPaused returns (uint256 submissionId) {
         require(proofHash != bytes32(0), "empty proof");
         Job storage job = jobs[jobId]; require(job.status == JobStatus.Open, "job not open"); require(block.timestamp <= job.deadline, "deadline passed");
         require(submittedTasks > 0 && uint256(job.verifiedTasks) + submittedTasks <= job.totalTasks, "invalid task count");
+        if (job.isWhitelist) { require(whitelistedWorkers[jobId][msg.sender], "not whitelisted"); }
         submissionId = nextSubmissionId++; submissions[submissionId] = Submission(jobId, msg.sender, submittedTasks, 0, proofHash, false);
         reputation[msg.sender].submittedTasks += submittedTasks; emit WorkSubmitted(submissionId, jobId, msg.sender, submittedTasks, proofHash);
     }

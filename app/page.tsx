@@ -1040,6 +1040,7 @@ function TaskGiverView({
   onRefresh,
   onVerify,
   onCancel,
+  onWhitelist,
   busy,
   message,
 }: {
@@ -1456,7 +1457,7 @@ function WhitelistModal({
   onClose: () => void;
   onSubmit: (addresses: string[]) => void;
 }) {
-  const [addresses, setAddresses] = React.useState("");
+  const [addresses, setAddresses] = useState("");
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="create-modal">
@@ -1506,7 +1507,7 @@ function SubmitProofModal({
   onClose: () => void;
   onSubmit: (proofText: string) => void;
 }) {
-  const [proof, setProof] = React.useState("");
+  const [proof, setProof] = useState("");
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="create-modal">

@@ -2,7 +2,7 @@ import { defineChain } from 'viem';
 
 export const ARC_RPC = process.env.NEXT_PUBLIC_ARC_RPC || 'https://rpc.testnet.arc.network';
 export const USDC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_ADDRESS || '0x3600000000000000000000000000000000000000') as `0x${string}`;
-export const ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x277aFbdE7B6C8F5Bf29107EE92592a5Ff430Cbd4') as `0x${string}`;
+export const ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x47b521bb224124e8bfafcfb431ed428e89346147') as `0x${string}`;
 export const arcTestnet = defineChain({ id: 5042002, name: 'Arc Testnet', nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 6 }, rpcUrls: { default: { http: [ARC_RPC] } }, blockExplorers: { default: { name: 'ArcScan', url: 'https://testnet.arcscan.app' } } });
 
 export const USDC_ABI = [

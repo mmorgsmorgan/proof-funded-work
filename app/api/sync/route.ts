@@ -2,14 +2,6 @@ import { syncEvents, getCachedJobs, getCachedSubmissions } from '../../../backen
 
 export const runtime = 'nodejs';
 
-/**
- * GET /api/sync — Trigger an event sync and return cached on-chain data.
- *
- * Query params:
- *   ?client=0x...  — filter jobs by client address
- *   ?worker=0x...  — filter submissions by worker address
- *   ?jobId=0       — filter submissions by job ID
- */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -18,12 +10,10 @@ export async function GET(request: Request) {
     const jobIdParam = url.searchParams.get('jobId');
     const jobId = jobIdParam !== null ? Number(jobIdParam) : undefined;
 
-    // Sync latest events from chain
     const syncResult = await syncEvents();
 
-    // Return cached data
-    const jobs = getCachedJobs(client ? { client } : undefined);
-    const submissions = getCachedSubmissions(
+    const jobs = await getCachedJobs(client ? { client } : undefined);
+    const submissions = await getCachedSubmissions(
       worker ? { worker } : jobId !== undefined ? { jobId } : undefined,
     );
 

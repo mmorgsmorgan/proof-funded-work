@@ -548,7 +548,12 @@ function Workspace({
 
   async function writeContract(
     functionName:
-      "submitWork" | "claim" | "verifyWork" | "cancelJob" | "createJob",
+      | "submitWork"
+      | "claim"
+      | "verifyWork"
+      | "cancelJob"
+      | "createJob"
+      | "whitelistWorkers",
     args: readonly unknown[],
   ) {
     if (!embeddedWallet || !wallet)

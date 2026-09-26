@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const { hash, content } = await request.json();
   if (!hash || !content) return Response.json({ error: 'missing fields' }, { status: 400 });
   try {
-    getDatabase().prepare('INSERT OR IGNORE INTO proofs (hash, content, created_at) VALUES (?, ?, datetime("now"))').run(hash, content);
+    getDatabase().prepare('INSERT OR IGNORE INTO proofs (hash, content, created_at) VALUES (?, ?, datetime(\'now\'))').run(hash, content);
     return Response.json({ success: true });
   } catch (e: any) {
     return Response.json({ error: e.message }, { status: 500 });

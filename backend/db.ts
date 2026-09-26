@@ -59,6 +59,13 @@ function openDatabase() {
     );
     CREATE INDEX IF NOT EXISTS reviews_submission_idx ON reviews(submission_id);
   `);
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS proofs (
+      hash TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
   return database;
 }
 

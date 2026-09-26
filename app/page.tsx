@@ -595,10 +595,16 @@ function Workspace({
     setBusy(true);
     setMessage("Confirm your work proof in the wallet…");
     try {
+      const proofHashStr = keccak256(stringToBytes(proofText));
+      await fetch('/api/proofs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash: proofHashStr, content: proofText })
+      });
       const hash = await writeContract("submitWork", [
         jobId,
         1n,
-        keccak256(stringToBytes(proofText)),
+        proofHashStr,
       ]);
       setMessage(`Proof submitted · ${hash.slice(0, 10)}…`);
       await refresh();
@@ -1557,6 +1563,15 @@ function ReviewModal({
   ) => void;
 }) {
   const [feedback, setFeedback] = useState("");
+  const [proofText, setProofText] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/proofs?hash=${submission.proofHash}`)
+      .then(res => res.json())
+      .then(data => { if (data.content) setProofText(data.content); })
+      .catch(console.error);
+  }, [submission.proofHash]);
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="create-modal">
@@ -1565,6 +1580,12 @@ function ReviewModal({
         </button>
         <span className="label">Submission #{submission.id.toString()}</span>
         <h2>Review and respond.</h2>
+        
+        <div style={{ background: 'var(--surface-sunken)', padding: '16px', borderRadius: '8px', marginBottom: '24px', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
+          <strong>Worker's Proof:</strong><br/>
+          {proofText ? proofText : <span style={{ color: 'var(--text-tertiary)' }}>No text provided or proof hash mismatch.</span>}
+        </div>
+
         <label>
           Feedback
           <textarea

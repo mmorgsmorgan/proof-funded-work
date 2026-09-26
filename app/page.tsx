@@ -189,9 +189,11 @@ function Workspace({ account, wallet }: { account: Account; wallet?: `0x${string
       const approval = await client.writeContract({ address: USDC_ADDRESS, abi: USDC_ABI, functionName: 'approve', args: [ESCROW_ADDRESS, totalTasks * reward] });
       setMessage(`Waiting for USDC approval (tx: ${approval.slice(0, 10)})...`);
       await publicClient.waitForTransactionReceipt({ hash: approval });
+      setMessage('Syncing state on Arc Testnet...');
+      await new Promise(r => setTimeout(r, 4000)); // RPC state sync delay
       setMessage('Confirm job creation in your wallet...');
       const metadata = JSON.stringify({ title: form.title, description: form.description });
-      const hash = await client.writeContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'createJob', args: [totalTasks, reward, deadline, metadata, form.isWhitelist] });
+      const hash = await client.writeContract({ address: ESCROW_ADDRESS, abi: ESCROW_ABI, functionName: 'createJob', args: [totalTasks, reward, deadline, metadata, form.isWhitelist], gas: 1000000n });
       setShowCreate(false); setMessage(`Job funded · ${hash.slice(0, 10)}…`); await refresh();
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'Job creation was cancelled.'); }
     finally { setBusy(false); }

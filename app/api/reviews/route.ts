@@ -1,4 +1,4 @@
-import { getDatabase } from '../../../backend/db';
+import { query, queryAll } from '../../../backend/db';
 import { verifyPrivyRequest } from '../../../backend/privy';
 import { uuidv7 } from '../../../backend/accounts';
 import { rateLimit, keyFromAuth, rateLimitResponse } from '../../../backend/rate-limit';
@@ -11,9 +11,8 @@ export async function GET(request: Request) {
   const submissionId = url.searchParams.get('submissionId');
   if (!submissionId) return Response.json({ error: 'submissionId is required' }, { status: 400 });
   
-  const db = getDatabase();
-  const reviews = db.prepare('SELECT * FROM reviews WHERE submission_id = ? ORDER BY created_at DESC').all(submissionId);
-  return Response.json({ reviews });
+  const rows = await queryAll('SELECT * FROM reviews WHERE submission_id = $1 ORDER BY created_at DESC', [submissionId]);
+  return Response.json({ reviews: rows });
 }
 
 export async function POST(request: Request) {
@@ -29,10 +28,12 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const db = getDatabase();
     const id = uuidv7();
     
-    db.prepare('INSERT INTO reviews (id, submission_id, reviewer, feedback, status, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))').run(id, submissionId, identity.walletAddress.toLowerCase(), feedback, status);
+    await query(
+      'INSERT INTO reviews (id, submission_id, reviewer, feedback, status, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, submissionId, identity.walletAddress.toLowerCase(), feedback, status, new Date().toISOString()]
+    );
 
     logger.info('review_created', { id, submissionId, reviewer: identity.walletAddress, status });
     return Response.json({ success: true, reviewId: id });

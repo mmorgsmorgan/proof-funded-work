@@ -1,6 +1,4 @@
-import { mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { Pool, PoolClient } from 'pg';
 
 export type AccountRole = 'worker' | 'task_giver';
 export type AccountRecord = {
@@ -13,21 +11,23 @@ export type AccountRecord = {
   updated_at: string;
 };
 
-const globalDatabase = globalThis as typeof globalThis & { qitDatabase?: DatabaseSync };
+const globalPool = globalThis as typeof globalThis & { qitPool?: Pool; qitReady?: boolean };
 
-function openDatabase() {
-  const raw = process.env.QIT_DB_PATH || '';
-  // Ignore database URLs — SQLite needs a file path, not a connection string
-  const isUrl = raw.startsWith('postgresql') || raw.startsWith('postgres') || raw.startsWith('mysql');
-  // On serverless (Vercel), only /tmp is writable
-  const defaultPath = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
-    ? '/tmp/qit.sqlite'
-    : join(process.cwd(), 'data', 'qit.sqlite');
-  const filename = (raw && !isUrl) ? raw : defaultPath;
-  mkdirSync(dirname(filename), { recursive: true });
-  const database = new DatabaseSync(filename);
-  database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
-  database.exec(`
+function createPool(): Pool {
+  const url = process.env.DATABASE_URL || process.env.QIT_DB_PATH || '';
+  if (!url) throw new Error('DATABASE_URL is not set');
+  return new Pool({ connectionString: url, max: 5, ssl: url.includes('railway') ? { rejectUnauthorized: false } : undefined });
+}
+
+export function getPool(): Pool {
+  if (!globalPool.qitPool) globalPool.qitPool = createPool();
+  return globalPool.qitPool;
+}
+
+export async function initDatabase(): Promise<void> {
+  if (globalPool.qitReady) return;
+  const pool = getPool();
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
       privy_user_id TEXT NOT NULL UNIQUE,
@@ -40,7 +40,7 @@ function openDatabase() {
     CREATE INDEX IF NOT EXISTS accounts_email_idx ON accounts(email);
     CREATE INDEX IF NOT EXISTS accounts_wallet_idx ON accounts(wallet_address);
   `);
-  database.exec(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS idempotency_keys (
       key TEXT PRIMARY KEY,
       response_status INTEGER NOT NULL,
@@ -48,7 +48,7 @@ function openDatabase() {
       created_at TEXT NOT NULL
     );
   `);
-  database.exec(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS reviews (
       id TEXT PRIMARY KEY,
       submission_id INTEGER NOT NULL,
@@ -59,17 +59,30 @@ function openDatabase() {
     );
     CREATE INDEX IF NOT EXISTS reviews_submission_idx ON reviews(submission_id);
   `);
-  database.exec(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS proofs (
       hash TEXT PRIMARY KEY,
       content TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
   `);
-  return database;
+  globalPool.qitReady = true;
 }
 
-export function getDatabase() {
-  if (!globalDatabase.qitDatabase) globalDatabase.qitDatabase = openDatabase();
-  return globalDatabase.qitDatabase;
+/** Helper: run a query after ensuring DB is initialized */
+export async function query(text: string, params?: any[]) {
+  await initDatabase();
+  return getPool().query(text, params);
+}
+
+/** Helper: get a single row */
+export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | undefined> {
+  const result = await query(text, params);
+  return result.rows[0] as T | undefined;
+}
+
+/** Helper: get all rows */
+export async function queryAll<T = any>(text: string, params?: any[]): Promise<T[]> {
+  const result = await query(text, params);
+  return result.rows as T[];
 }
